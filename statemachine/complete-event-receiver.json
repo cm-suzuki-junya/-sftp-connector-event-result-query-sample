@@ -1,0 +1,60 @@
+{
+    "Comment": "SFTP connector omplete event receiver",
+    "StartAt": "UpdateStatus",
+    "States": {
+      "UpdateStatus": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::dynamodb:putItem",
+        "Parameters": {
+          "TableName": "${StatusTableName}",
+          "Item": {
+            "TransferStatus": {
+              "S.$": "$.detail.status-code"
+            },
+            "FilePath": {
+              "S.$": "$.detail.file-path"
+            }
+          }
+        },
+        "Next": "Query",
+        "ResultPath": null
+      },
+      "Query": {
+        "Type": "Task",
+        "Parameters": {
+          "TableName": "${StatusTableName}",
+          "KeyConditionExpression": "TransferStatus = :target_status",
+          "ExpressionAttributeValues": {
+            ":target_status": {
+              "S": "NOT_COMPLETE"
+            }
+          }
+        },
+        "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
+        "Next": "Include NOT_COMPLETE?"
+      },
+      "Include NOT_COMPLETE?": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.Count",
+            "NumericEquals": 0,
+            "Next": "StartQueryExecution"
+          }
+        ],
+        "Default": "Pass"
+      },
+      "StartQueryExecution": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::athena:startQueryExecution",
+        "Parameters": {
+          "QueryString": "SELECT Count(id) FROM sample_table"
+        },
+        "End": true
+      },
+      "Pass": {
+        "Type": "Pass",
+        "End": true
+      }
+    }
+  }

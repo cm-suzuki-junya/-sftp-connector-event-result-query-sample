@@ -5,6 +5,9 @@ Parameters:
   ConnectorId:
     Type: String
 Resources:
+  #---------------------------------------------
+  #---- Transfer Machine
+  #---------------------------------------------
   TransferExecutor:
     Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
     Properties:
@@ -21,6 +24,85 @@ Resources:
           Properties:
             Description: Run everyday
             Schedule: "rate(1 day)"
+  TransferExecuterStateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+      Policies:
+        - PolicyName: "transfer-execute-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: dynamodb:PutItem
+                Resource:
+                  - !GetAtt TransferStatusTable.Arn
+              - Effect: Allow
+                Action: transfer:StartFileTransfer
+                Resource:
+                  - !Sub arn:aws:transfer:${AWS::Region}:${AWS::AccountId}:connector/${ConnectorId}
+  #---------------------------------------------
+  #---- Complete Event Receive Machine
+  #---------------------------------------------
+  CompleteEventReceiver:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      DefinitionUri: statemachine/complete-event-receiver.json
+      DefinitionSubstitutions:
+        StatusTableName: !Ref TransferStatusTable
+      Role: !GetAtt CompleteEventReceiverRole.Arn
+      Events:
+        CompleteEvent:
+          Type: EventBridgeRule 
+          Properties:
+            RuleName: sftp-connector-complete-event-rule
+            Target:
+              Id: complete-receive-machine
+            Pattern:
+              source:
+                - "aws.transfer"
+              detail-type:
+                - "SFTP Connector File Retrieve Completed"
+              resources:
+                - !Sub arn:aws:transfer:${AWS::Region}:${AWS::AccountId}:connector/${ConnectorId}
+  CompleteEventReceiverRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+      Policies:
+        - PolicyName: "complete-event-receiver-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt TransferStatusTable.Arn
+              - Effect: Allow
+                Action: 
+                  - athena:StartQueryExecution
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/primary
+
+  #---------------------------------------------
+  #----　Others
+  #---------------------------------------------
   TransferStatusTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -47,27 +129,34 @@ Resources:
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
-  TransferExecuterStateMachineRole:
-    Type: AWS::IAM::Role
+  Database:
+    Type: AWS::Glue::Database
     Properties:
-      Path: /
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service: states.amazonaws.com
-      Policies:
-        - PolicyName: "transfer-execute-policy"
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: dynamodb:PutItem
-                Resource:
-                  - !GetAtt TransferStatusTable.Arn
-              - Effect: Allow
-                Action: transfer:StartFileTransfer
-                Resource:
-                  - !Sub arn:aws:transfer:${AWS::Region}:${AWS::AccountId}:connector/${ConnectorId}
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: sftp-connector-sample-db
+  GlueTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref Database
+      TableInput:
+        Name: sample_table
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          skip.header.line.count: '1'
+        StorageDescriptor:
+          Columns:
+            - Name: id
+              Type: Int
+            - Name: hash_value
+              Type: String
+            - Name: created_at
+              Type: Timestamp
+          Location: !Sub "s3://${DataBucket}/dest/"
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+            Parameters:
+              field.delim: '\t'

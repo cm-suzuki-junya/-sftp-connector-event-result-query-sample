@@ -1,5 +1,5 @@
 {
-  "Comment": "Init and Execute SFTP",
+  "Comment": "Execute SFTP",
   "StartAt": "InitFilePath",
   "States": {
     "InitFilePath": {
