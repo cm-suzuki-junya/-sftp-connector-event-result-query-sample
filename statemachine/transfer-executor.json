@@ -1,5 +1,5 @@
 {
-  "Comment": "Init and execute SFTP",
+  "Comment": "Init and Execute SFTP",
   "StartAt": "InitFilePath",
   "States": {
     "InitFilePath": {
@@ -16,7 +16,7 @@
             "Parameters": {
               "TableName": "${StatusTableName}",
               "Item": {
-                "Status": {
+                "TransferStatus": {
                   "S": "IN_PROGRESS"
                 },
                 "FilePath": {

@@ -26,12 +26,12 @@ Resources:
     Properties:
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: "Status"
+        - AttributeName: "TransferStatus"
           AttributeType: "S"
         - AttributeName: "FilePath"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "Status"
+        - AttributeName: "TransferStatus"
           KeyType: "HASH"
         - AttributeName: "FilePath"
           KeyType: "RANGE"      
