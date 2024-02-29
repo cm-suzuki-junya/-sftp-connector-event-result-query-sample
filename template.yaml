@@ -57,6 +57,7 @@ Resources:
       DefinitionUri: statemachine/complete-event-receiver.json
       DefinitionSubstitutions:
         StatusTableName: !Ref TransferStatusTable
+        AthenaWorkGroup: !Ref WorkGroup
       Role: !GetAtt CompleteEventReceiverRole.Arn
       Events:
         CompleteEvent:
@@ -98,7 +99,20 @@ Resources:
                 Action: 
                   - athena:StartQueryExecution
                 Resource:
-                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/primary
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${WorkGroup}
+              - Effect: Allow
+                Action: 
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:ListMultipartUploadParts
+                  - s3:AbortMultipartUpload
+                  - s3:CreateBucket
+                  - s3:PutObject"
+                Resource:
+                  - !GetAtt DataBucket.Arn
+                  - !Sub ${DataBucket.Arn}/*
 
   #---------------------------------------------
   #----　Others
@@ -153,10 +167,24 @@ Resources:
               Type: String
             - Name: created_at
               Type: Timestamp
-          Location: !Sub "s3://${DataBucket}/dest/"
+          Location: !Sub s3://${DataBucket}/dest/
           InputFormat: org.apache.hadoop.mapred.TextInputFormat
           OutputFormat: org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat
           SerdeInfo:
             SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
             Parameters:
               field.delim: '\t'
+  WorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: sftp-connector-sample
+      State: ENABLED
+      WorkGroupConfigurationUpdates:
+        BytesScannedCutoffPerQuery: 10000000
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: false
+        RequesterPaysEnabled: false
+        ResultConfigurationUpdates:
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+          OutputLocation: !Sub s3://${DataBucket}/summary/
