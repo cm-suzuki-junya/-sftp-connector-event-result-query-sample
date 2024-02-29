@@ -1,0 +1,59 @@
+{
+  "Comment": "Init and execute SFTP",
+  "StartAt": "InitFilePath",
+  "States": {
+    "InitFilePath": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "RegistStatus",
+        "States": {
+          "RegistStatus": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "Parameters": {
+              "TableName": "${StatusTableName}",
+              "Item": {
+                "Status": {
+                  "S": "IN_PROGRESS"
+                },
+                "FilePath": {
+                  "S.$": "$"
+                }
+              }
+            },
+            "End": true
+          }
+        }
+      },
+      "Next": "MainFlow",
+      "ItemsPath": "$.FilePath",
+      "ResultPath": null
+    },
+    "MainFlow": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "StartFileTransfer",
+        "States": {
+          "StartFileTransfer": {
+            "Type": "Task",
+            "End": true,
+            "Parameters": {
+              "ConnectorId": "${ConnectorId}",
+              "RetrieveFilePaths.$": "States.Array($)",
+              "LocalDirectoryPath": "/${BucketName}/${S3Path}"
+            },
+            "Resource": "arn:aws:states:::aws-sdk:transfer:startFileTransfer"
+          }
+        }
+      },
+      "End": true,
+      "ItemsPath": "$.FilePath"
+    }
+  }
+}
