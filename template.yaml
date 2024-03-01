@@ -11,7 +11,7 @@ Resources:
   #---- Transfer Machine
   #---------------------------------------------
   TransferExecutor:
-    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Type: AWS::Serverless::StateMachine 
     Properties:
       DefinitionUri: statemachine/transfer-executor.json
       DefinitionSubstitutions:
@@ -48,7 +48,7 @@ Resources:
   #---- Complete Event Receive Machine
   #---------------------------------------------
   CompleteEventReceiver:
-    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Type: AWS::Serverless::StateMachine 
     Properties:
       DefinitionUri: statemachine/complete-event-receiver.json
       DefinitionSubstitutions:
@@ -125,7 +125,7 @@ Resources:
   #---- Athena Report Machine
   #---------------------------------------------
   AthenaResultReportMachine:
-    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Type: AWS::Serverless::StateMachine 
     Properties:
       DefinitionUri: statemachine/athena-result-repoter.json
       DefinitionSubstitutions:
@@ -211,7 +211,6 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
-      #GSIを嫌ったせいで少し歪な感覚のあるテーブル設計
       AttributeDefinitions:
         - AttributeName: "FilePath"
           AttributeType: "S"
