@@ -20,12 +20,6 @@ Resources:
         BucketName: !Ref DataBucket
         S3Path: "dest"
       Role: !GetAtt TransferExecuterStateMachineRole.Arn
-      Events:
-        DaylySchedule:
-          Type: Schedule 
-          Properties:
-            Description: Run everyday
-            Schedule: "rate(1 day)"
   TransferExecuterStateMachineRole:
     Type: AWS::IAM::Role
     Properties:
