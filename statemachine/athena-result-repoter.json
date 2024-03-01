@@ -1,12 +1,20 @@
 {
     "Comment": "A description of my state machine",
-    "StartAt": "GetObject",
+    "StartAt": "Athena GetQueryExecution",
     "States": {
+      "Athena GetQueryExecution": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::athena:getQueryExecution",
+        "Parameters": {
+          "QueryExecutionId.$": "$.detail.queryExecutionId"
+        },
+        "Next": "GetObject"
+      },
       "GetObject": {
         "Type": "Task",
         "Parameters": {
-          "Bucket.$": "$.detail.bucket.name",
-          "Key.$": "$.detail.object.key"
+          "Bucket": "${BucketName}",
+          "Key.$": "States.Format('{}{}.csv','${OutputPrefix}', $.QueryExecution.QueryExecutionId)"
         },
         "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
         "Next": "SNS Publish"

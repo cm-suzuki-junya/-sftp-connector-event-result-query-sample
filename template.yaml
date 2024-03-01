@@ -124,6 +124,8 @@ Resources:
       DefinitionUri: statemachine/athena-result-repoter.json
       DefinitionSubstitutions:
         SnsTopicArn: !Ref AthenaReportTopic
+        BucketName: !Ref DataBucket
+        OutputPrefix: summary/
       Role: !GetAtt AthenaResultReportMachineRole.Arn
       Events:
         CompleteEvent:
@@ -134,17 +136,14 @@ Resources:
               Id: complete-receive-machine
             Pattern:
               source:
-                - "aws.s3"
+                - "aws.athena"
               detail-type:
-                - "Object Created"
+                - "Athena Query State Change"
               detail:
-                object:
-                  key:
-                    - prefix: output
-                    - suffix: csv
-                buclet:
-                  name: 
-                    -  !Ref DataBucket
+                currentState:
+                  - "SUCCEEDED"
+                workgroupName: 
+                  - !Ref WorkGroup
   AthenaResultReportMachineRole:
     Type: AWS::IAM::Role
     Properties:
@@ -171,7 +170,12 @@ Resources:
                   - sns:Publish
                 Resource:
                   - !Ref AthenaReportTopic
-  FailoverEventTopicPolicy:
+              - Effect: Allow
+                Action: 
+                  - athena:GetQueryExecution
+                Resource:
+                  - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${WorkGroup}
+  AthenaReportTopicPolicy:
     Type: 'AWS::SNS::TopicPolicy'
     Properties:
       PolicyDocument:
@@ -254,7 +258,7 @@ Resources:
           SerdeInfo:
             SerializationLibrary: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
             Parameters:
-              field.delim: '\t'
+              field.delim: "\t"
   WorkGroup:
     Type: AWS::Athena::WorkGroup
     Properties:
