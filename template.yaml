@@ -261,8 +261,6 @@ Resources:
       TableInput:
         Name: sample_table
         TableType: EXTERNAL_TABLE
-        Parameters:
-          skip.header.line.count: '1'
         StorageDescriptor:
           Columns:
             - Name: id
