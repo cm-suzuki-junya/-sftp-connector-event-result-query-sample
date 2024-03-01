@@ -4,6 +4,8 @@ Transform: AWS::Serverless-2016-10-31
 Parameters:
   ConnectorId:
     Type: String
+  ReportReceiveAddress:
+    Type: String
 Resources:
   #---------------------------------------------
   #---- Transfer Machine
@@ -109,11 +111,89 @@ Resources:
                   - s3:ListMultipartUploadParts
                   - s3:AbortMultipartUpload
                   - s3:CreateBucket
-                  - s3:PutObject"
+                  - s3:PutObject
                 Resource:
                   - !GetAtt DataBucket.Arn
                   - !Sub ${DataBucket.Arn}/*
-
+  #---------------------------------------------
+  #---- Athena Report Machine
+  #---------------------------------------------
+  AthenaResultReportMachine:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      DefinitionUri: statemachine/athena-result-repoter.json
+      DefinitionSubstitutions:
+        SnsTopicArn: !Ref AthenaReportTopic
+      Role: !GetAtt AthenaResultReportMachineRole.Arn
+      Events:
+        CompleteEvent:
+          Type: EventBridgeRule 
+          Properties:
+            RuleName: sftp-connector-result-report-rule
+            Target:
+              Id: complete-receive-machine
+            Pattern:
+              source:
+                - "aws.s3"
+              detail-type:
+                - "Object Created"
+              detail:
+                object:
+                  key:
+                    - prefix: output
+                    - suffix: csv
+                buclet:
+                  name: 
+                    -  !Ref DataBucket
+  AthenaResultReportMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+      Policies:
+        - PolicyName: "complete-event-receiver-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - s3:GetObject
+                Resource:
+                  - !Sub ${DataBucket.Arn}/summary/*
+              - Effect: Allow
+                Action: 
+                  - sns:Publish
+                Resource:
+                  - !Ref AthenaReportTopic
+  FailoverEventTopicPolicy:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: 'sns:Publish'
+            Resource: '*'
+      Topics:
+        - !Ref AthenaReportTopic
+  AthenaReportTopic:
+    Type: AWS::SNS::Topic
+    Properties: 
+      TopicName: sftp-connecter-result-report
+      DisplayName: sftp-connecter-result-report
+  AthenaReportSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AthenaReportTopic
+      Protocol: email
+      Endpoint: !Ref ReportReceiveAddress
   #---------------------------------------------
   #----　Others
   #---------------------------------------------
@@ -121,6 +201,7 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       BillingMode: PAY_PER_REQUEST
+      #GSIを嫌ったせいで少し歪な感覚のあるテーブル設計
       AttributeDefinitions:
         - AttributeName: "TransferStatus"
           AttributeType: "S"
@@ -179,12 +260,12 @@ Resources:
     Properties:
       Name: sftp-connector-sample
       State: ENABLED
-      WorkGroupConfigurationUpdates:
+      WorkGroupConfiguration:
         BytesScannedCutoffPerQuery: 10000000
         EnforceWorkGroupConfiguration: true
         PublishCloudWatchMetricsEnabled: false
         RequesterPaysEnabled: false
-        ResultConfigurationUpdates:
+        ResultConfiguration:
           EncryptionConfiguration:
             EncryptionOption: SSE_S3
           OutputLocation: !Sub s3://${DataBucket}/summary/

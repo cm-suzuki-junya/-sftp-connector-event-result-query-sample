@@ -48,7 +48,7 @@
         "Type": "Task",
         "Resource": "arn:aws:states:::athena:startQueryExecution",
         "Parameters": {
-          "QueryString": "SELECT Count(id) FROM sample_table",
+          "QueryString": "SELECT Count(id) as DataCount FROM sample_table",
           "WorkGroup": "${AthenaWorkGroup}"
         },
         "End": true

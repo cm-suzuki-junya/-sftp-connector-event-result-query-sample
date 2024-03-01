@@ -1,0 +1,24 @@
+{
+    "Comment": "A description of my state machine",
+    "StartAt": "GetObject",
+    "States": {
+      "GetObject": {
+        "Type": "Task",
+        "Parameters": {
+          "Bucket.$": "$.detail.bucket.name",
+          "Key.$": "$.detail.object.key"
+        },
+        "Resource": "arn:aws:states:::aws-sdk:s3:getObject",
+        "Next": "SNS Publish"
+      },
+      "SNS Publish": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::sns:publish",
+        "Parameters": {
+          "TopicArn": "${SnsTopicArn}",
+          "Message.$": "$"
+        },
+        "End": true
+      }
+    }
+  }
