@@ -60,6 +60,9 @@ Resources:
       DefinitionSubstitutions:
         StatusTableName: !Ref TransferStatusTable
         AthenaWorkGroup: !Ref WorkGroup
+        GlueDBName: !Ref Database
+        GlueTablename: !Ref GlueTable
+        DBIndexName: TransferStatus-hash
       Role: !GetAtt CompleteEventReceiverRole.Arn
       Events:
         CompleteEvent:
@@ -93,15 +96,24 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: 
-                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
                   - dynamodb:Query
                 Resource:
                   - !GetAtt TransferStatusTable.Arn
+                  - !Sub ${TransferStatusTable.Arn}/index/*
               - Effect: Allow
                 Action: 
                   - athena:StartQueryExecution
                 Resource:
                   - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${WorkGroup}
+              - Effect: Allow
+                Action: 
+                  - glue:GetDatabase
+                  - glue:GetTable
+                Resource:
+                  - !Sub arn:aws:glue:ap-northeast-1:${AWS::AccountId}:catalog
+                  - !Sub arn:aws:glue:ap-northeast-1:${AWS::AccountId}:database/${Database}
+                  - !Sub arn:aws:glue:ap-northeast-1:${AWS::AccountId}:table/${Database}/*
               - Effect: Allow
                 Action: 
                   - s3:GetBucketLocation
@@ -207,15 +219,22 @@ Resources:
       BillingMode: PAY_PER_REQUEST
       #GSIを嫌ったせいで少し歪な感覚のあるテーブル設計
       AttributeDefinitions:
-        - AttributeName: "TransferStatus"
-          AttributeType: "S"
         - AttributeName: "FilePath"
+          AttributeType: "S"
+        - AttributeName: "TransferStatus"
           AttributeType: "S"
       KeySchema:
-        - AttributeName: "TransferStatus"
-          KeyType: "HASH"
         - AttributeName: "FilePath"
-          KeyType: "RANGE"      
+          KeyType: "HASH"
+      GlobalSecondaryIndexes:
+        - IndexName: "TransferStatus-hash"
+          KeySchema:
+            - AttributeName: "TransferStatus"
+              KeyType: "HASH"
+            - AttributeName: "FilePath"
+              KeyType: "RANGE"
+          Projection:
+            ProjectionType: KEYS_ONLY
   DataBucket:
     Type: AWS::S3::Bucket
     Properties:

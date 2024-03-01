@@ -4,15 +4,18 @@
     "States": {
       "UpdateStatus": {
         "Type": "Task",
-        "Resource": "arn:aws:states:::dynamodb:putItem",
+        "Resource": "arn:aws:states:::dynamodb:updateItem",
         "Parameters": {
           "TableName": "${StatusTableName}",
-          "Item": {
-            "TransferStatus": {
-              "S.$": "$.detail.status-code"
-            },
+          "Key": {
             "FilePath": {
               "S.$": "$.detail.file-path"
+            }
+          },
+          "UpdateExpression": "SET TransferStatus = :InputStatus",
+          "ExpressionAttributeValues": {
+            ":InputStatus": {
+              "S.$": "$.detail.status-code"
             }
           }
         },
@@ -23,10 +26,11 @@
         "Type": "Task",
         "Parameters": {
           "TableName": "${StatusTableName}",
+          "IndexName": "${DBIndexName}",
           "KeyConditionExpression": "TransferStatus = :target_status",
           "ExpressionAttributeValues": {
             ":target_status": {
-              "S": "NOT_COMPLETE"
+              "S": "IN_PROGRESS"
             }
           }
         },
@@ -48,7 +52,11 @@
         "Type": "Task",
         "Resource": "arn:aws:states:::athena:startQueryExecution",
         "Parameters": {
-          "QueryString": "SELECT Count(id) as DataCount FROM sample_table",
+          "QueryExecutionContext": {
+            "Catalog": "awsdatacatalog",
+            "Database": "${GlueDBName}"
+          },
+          "QueryString": "SELECT Count(id) as DataCount FROM ${GlueTablename}",
           "WorkGroup": "${AthenaWorkGroup}"
         },
         "End": true
