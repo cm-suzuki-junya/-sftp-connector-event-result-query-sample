@@ -19,10 +19,10 @@ sam build
 
 ## デプロイ
 
-`ConnectorId`には事前に作成したSFTPコネクタのID、`ReportReceiveAddress`には通知先のメールアドレスを指定してください。
+`ConnectorId`には事前に作成したSFTPコネクタのID、`ReportReceiveAddress`には通知先のメールアドレス、`MaxParallelCount`には最大同時転送数を指定してください。
 
 ```bash
-sam deploy --parameter-overrides ConnectorId=c-xxxxx ReportReceiveAddress=foo@example.com
+sam deploy --parameter-overrides ConnectorId=c-xxxxx ReportReceiveAddress=foo@example.com MaxParallelCount=3
 ```
 
 リソース作成後Amazon SNSの認証確認のためのメールが送られてくるため確認してください。

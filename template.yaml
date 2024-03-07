@@ -6,6 +6,8 @@ Parameters:
     Type: String
   ReportReceiveAddress:
     Type: String
+  MaxParallelLength:
+    Type: Number
 Resources:
   #---------------------------------------------
   #---- Transfer Machine
@@ -19,6 +21,8 @@ Resources:
         ConnectorId: !Ref ConnectorId
         BucketName: !Ref DataBucket
         S3Path: "dest"
+        QueueUrl: !GetAtt StandbyFileQueue.QueueUrl
+        MaxParallelLength: !Ref MaxParallelLength
       Role: !GetAtt TransferExecuterStateMachineRole.Arn
   TransferExecuterStateMachineRole:
     Type: AWS::IAM::Role
@@ -44,6 +48,11 @@ Resources:
                 Action: transfer:StartFileTransfer
                 Resource:
                   - !Sub arn:aws:transfer:${AWS::Region}:${AWS::AccountId}:connector/${ConnectorId}
+              - Effect: Allow
+                Action: 
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt StandbyFileQueue.Arn
   #---------------------------------------------
   #---- Complete Event Receive Machine
   #---------------------------------------------
@@ -57,6 +66,10 @@ Resources:
         GlueDBName: !Ref Database
         GlueTablename: !Ref GlueTable
         DBIndexName: TransferStatus-hash
+        QueueUrl: !GetAtt StandbyFileQueue.QueueUrl
+        ConnectorId: !Ref ConnectorId
+        BucketName: !Ref DataBucket
+        S3Path: "dest"
       Role: !GetAtt CompleteEventReceiverRole.Arn
       Events:
         CompleteEvent:
@@ -97,6 +110,12 @@ Resources:
                   - !Sub ${TransferStatusTable.Arn}/index/*
               - Effect: Allow
                 Action: 
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                Resource:
+                  - !GetAtt StandbyFileQueue.Arn
+              - Effect: Allow
+                Action: 
                   - athena:StartQueryExecution
                 Resource:
                   - !Sub arn:aws:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${WorkGroup}
@@ -121,6 +140,10 @@ Resources:
                 Resource:
                   - !GetAtt DataBucket.Arn
                   - !Sub ${DataBucket.Arn}/*
+              - Effect: Allow
+                Action: transfer:StartFileTransfer
+                Resource:
+                  - !Sub arn:aws:transfer:${AWS::Region}:${AWS::AccountId}:connector/${ConnectorId}
   #---------------------------------------------
   #---- Athena Report Machine
   #---------------------------------------------
@@ -240,6 +263,8 @@ Resources:
       OwnershipControls:
         Rules:
           - ObjectOwnership: BucketOwnerEnforced
+  StandbyFileQueue:
+    Type: AWS::SQS::Queue
   Database:
     Type: AWS::Glue::Database
     Properties:

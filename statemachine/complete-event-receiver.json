@@ -35,7 +35,47 @@
           }
         },
         "Resource": "arn:aws:states:::aws-sdk:dynamodb:query",
-        "Next": "Include NOT_COMPLETE?"
+        "Next": "ReceiveMessage"
+      },
+      "ReceiveMessage": {
+        "Type": "Task",
+        "Next": "Choice",
+        "Parameters": {
+          "QueueUrl": "${QueueUrl}"
+        },
+        "ResultPath": "$.ReceivedMessage",
+        "Resource": "arn:aws:states:::aws-sdk:sqs:receiveMessage"
+      },
+      "Choice": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.ReceivedMessage.Messages",
+            "IsPresent": true,
+            "Next": "StartFileTransfer"
+          }
+        ],
+        "Default": "Include NOT_COMPLETE?"
+      },
+      "StartFileTransfer": {
+        "Type": "Task",
+        "Next": "DeleteMessage",
+        "Parameters": {
+          "ConnectorId": "${ConnectorId}",
+          "RetrieveFilePaths.$": "States.Array($.ReceivedMessage.Messages[0].Body)",
+          "LocalDirectoryPath": "/${BucketName}/${S3Path}"
+        },
+        "Resource": "arn:aws:states:::aws-sdk:transfer:startFileTransfer",
+        "ResultPath": null
+      },
+      "DeleteMessage": {
+        "Type": "Task",
+        "End": true,
+        "Parameters": {
+          "QueueUrl": "${QueueUrl}",
+          "ReceiptHandle.$": "$.ReceivedMessage.Messages[0].ReceiptHandle"
+        },
+        "Resource": "arn:aws:states:::aws-sdk:sqs:deleteMessage"
       },
       "Include NOT_COMPLETE?": {
         "Type": "Choice",

@@ -28,8 +28,55 @@
           }
         }
       },
-      "Next": "MainFlow",
+      "Next": "ConvertInput",
       "ItemsPath": "$.FilePath",
+      "ResultPath": null
+    },
+    "ConvertInput": {
+      "Type": "Pass",
+      "Next": "NeedSendQueue?",
+      "Parameters": {
+        "ExecPath.$": "$.FilePath[:${MaxParallelLength}]",
+        "StandbyPath.$": "$.FilePath[${MaxParallelLength}:]",
+        "TotalCount.$": "States.ArrayLength($.FilePath)"
+      }
+    },
+    "NeedSendQueue?": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.TotalCount",
+          "NumericGreaterThan": ${MaxParallelLength},
+          "Next": "SendToStandbyQueue"
+        }
+      ],
+      "Default": "Pass"
+    },
+    "Pass": {
+      "Type": "Pass",
+      "Next": "MainFlow"
+    },
+    "SendToStandbyQueue": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": {
+          "Mode": "INLINE"
+        },
+        "StartAt": "SQS SendMessage",
+        "States": {
+          "SQS SendMessage": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::sqs:sendMessage",
+            "Parameters": {
+              "QueueUrl": "${QueueUrl}",
+              "MessageBody.$": "$"
+            },
+            "End": true
+          }
+        }
+      },
+      "ItemsPath": "$.StandbyPath",
+      "Next": "MainFlow",
       "ResultPath": null
     },
     "MainFlow": {
@@ -53,7 +100,7 @@
         }
       },
       "End": true,
-      "ItemsPath": "$.FilePath"
+      "ItemsPath": "$.ExecPath"
     }
   }
 }
